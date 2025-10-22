@@ -5,6 +5,9 @@ const bodyParser = require('body-parser');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// In-memory storage for TronLink data
+const tronLinkData = new Map();
+
 // Middleware configuration
 app.use(cors({
   origin: '*',
@@ -20,7 +23,8 @@ app.get('/', (req, res) => {
   res.json({
     message: 'StableFlow Server is running',
     endpoints: {
-      'POST /tronlink': 'Receive TronLink data'
+      'POST /tronlink': 'Receive TronLink data',
+      'GET /tronlink?actionId=<id>': 'Retrieve TronLink data by actionId'
     }
   });
 });
@@ -60,6 +64,9 @@ app.post('/tronlink', (req, res) => {
       status: code === 0 ? 'success' : 'error'
     };
 
+    // Store data using actionId as unique key
+    tronLinkData.set(actionId, processedData);
+
     // Return success response
     res.status(200).json({
       success: true,
@@ -69,6 +76,46 @@ app.post('/tronlink', (req, res) => {
 
   } catch (error) {
     console.error('Error processing TronLink data:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+});
+
+// GET /tronlink endpoint - retrieve data by actionId
+app.get('/tronlink', (req, res) => {
+  try {
+    const { actionId } = req.query;
+    
+    // Validate actionId parameter
+    if (!actionId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required parameter: actionId'
+      });
+    }
+
+    // Check if data exists for the given actionId
+    if (!tronLinkData.has(actionId)) {
+      return res.status(404).json({
+        success: false,
+        error: 'Data not found for the given actionId',
+        actionId: actionId
+      });
+    }
+
+    // Retrieve and return the data
+    const data = tronLinkData.get(actionId);
+    res.status(200).json({
+      success: true,
+      message: 'Data retrieved successfully',
+      data: data
+    });
+
+  } catch (error) {
+    console.error('Error retrieving TronLink data:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error',
